@@ -7,6 +7,24 @@ import numpy as np
 import cmocean
 
 
+def apply_mask(darray, sftlf_file, realm):
+    """Mask ocean or land using a sftlf (land surface fraction) file.
+   
+    Args:
+     darray (xarray.DataArray): Data to mask
+     sftlf_file (str): Land surface fraction file
+     realm (str): Realm to mask
+   
+    """
+  
+    dset = xr.open_dataset(sftlf_file)
+  
+    if realm == 'land':
+        masked_darray = darray.where(dset['sftlf'].data < 50)
+    else:
+        masked_darray = darray.where(dset['sftlf'].data > 50)   
+  
+    return masked_darray
 
 
 def convert_pr_units(darray):
@@ -63,6 +81,11 @@ def main(inargs):
     
     clim = dset['pr'].groupby('time.season').mean('time', keep_attrs=True)
     clim = convert_pr_units(clim)
+    
+     if inargs.mask:
+        sftlf_file, realm = inargs.mask
+        clim = apply_mask(clim, sftlf_file, realm)
+
 
     create_plot(clim, dset.attrs['source_id'], inargs.season,
                 gridlines=inargs.gridlines, levels=inargs.cbar_levels)
@@ -76,7 +99,8 @@ if __name__ == '__main__':
     parser.add_argument("pr_file", type=str, help="Precipitation data file")
     parser.add_argument("season", type=str, help="Season to plot")
     parser.add_argument("output_file", type=str, help="Output file name")
-
+    parser.add_argument("--mask", type=str, nargs=2, metavar=('SFTLF_FILE', 'REALM'), default=None,
+                           help="""Provide sftlf file and realm to mask ('land' or 'ocean')""")
     parser.add_argument("--gridlines", action="store_true", default=False,
                         help="Include gridlines on the plot")
     parser.add_argument("--cbar_levels", type=float, nargs='*', default=None,
